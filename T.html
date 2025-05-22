@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Cookie Clicker 2D + Rebirth</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background-color: #1d2b53;
+      color: white;
+      overflow-x: hidden;
+      user-select: none;
+    }
+    h1 { margin-top: 20px; }
+    .cookie {
+      font-size: 100px;
+      width: 150px;
+      height: 150px;
+      margin: 20px auto;
+      cursor: pointer;
+      line-height: 150px;
+      transition: transform 0.2s;
+      border: none;
+    }
+    .cookie.clicked {
+      transform: scale(1.2);
+    }
+    .upgrade, #resetBtn, #rebirthBtn, #skinShop button {
+      margin: 5px 0;
+      padding: 10px;
+      width: 100%;
+      height: 50px;
+      background-color: #44aaff;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      border-radius: 5px;
+    }
+    #resetBtn { background-color: #ff4444; }
+    .upgrade-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #skinIcon {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      cursor: pointer;
+      z-index: 1000;
+      width: 48px;
+      height: 48px;
+    }
+    #skinShop {
+      display: none;
+      position: fixed;
+      top: 60px;
+      right: 10px;
+      background: #333;
+      color: white;
+      padding: 10px;
+      border-radius: 10px;
+      z-index: 1000;
+      width: 320px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    #customSkinPrompt {
+      margin-top: 10px;
+    }
+    #customSkinPrompt input {
+      font-size: 20px;
+      padding: 5px;
+      width: 70%;
+    }
+    #customSkinPrompt button {
+      padding: 5px 10px;
+      font-size: 16px;
+    }
+
+    /* Ikona sklepu po lewej */
+    #shopIcon {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      cursor: pointer;
+      z-index: 1000;
+      width: 48px;
+      height: 48px;
+    }
+    /* Kontener ulepszeń */
+    #upgrades {
+      display: none; /* ukryte domyślnie */
+      position: fixed;
+      top: 60px;
+      left: 10px;
+      background: #333;
+      color: white;
+      padding: 10px;
+      border-radius: 10px;
+      max-height: 80vh;
+      overflow-y: auto;
+      width: 320px;
+      z-index: 1000;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ciasteczka: <span id="cookieCount">0</span></h1>
+  <p id="stats">CPC: 1 | CPS: 0 | Rebirthy: 0 (bonus: 0%)</p>
+  <div class="cookie" id="cookie">🍪</div>
+
+  <!-- Ikona sklepu po lewej -->
+  <img src="https://img.icons8.com/emoji/48/shopping-cart-emoji.png" id="shopIcon" title="Sklep" alt="Sklep">
+  <!-- Ikona skórek po prawej -->
+  <img src="https://img.icons8.com/emoji/48/cookie.png" id="skinIcon" title="Skórki" alt="Skórki">
+
+  <div class="upgrade-container" id="upgrades"></div>
+
+  <button id="rebirthBtn" onclick="doRebirth()">🌟 Rebirth (wymaga 1 000 000 ciastek)</button>
+  <button id="resetBtn" onclick="resetGame()">🔁 Zresetuj grę</button>
+
+  <div id="skinShop">
+    <h3>Skórki</h3>
+    <button onclick="setSkin('default')">🍪 Domyślna</button>
+    <button onclick="setSkin('gold')">✨ Złota</button>
+    <button onclick="setSkin('pink')">🎀 Różowa</button>
+    <button onclick="setSkin('blue')">🔵 Niebieska</button>
+    <button onclick="setSkin('cat')">😺 Kotek</button>
+    <button onclick="setSkin('dog')">🐶 Piesek</button>
+    <button onclick="setSkin('frog')">🐸 Żabka</button>
+    <button onclick="setSkin('penguin')">🐧 Pingwin</button>
+    <button onclick="setSkin('bear')">🐻 Miś</button>
+    <button onclick="setSkin('pig')">🐷 Świnka</button>
+    <button onclick="showCustomSkinPrompt()">🎨 Własna</button>
+    <div id="customSkinPrompt" style="display:none;">
+      <input type="text" id="customEmojiInput" placeholder="Wpisz emotkę" maxlength="2">
+      <button onclick="applyCustomSkin()">OK</button>
+    </div>
+  </div>
+
+  <script>
+    let cookies = 0;
+    let cpc = 1;
+    let cps = 0;
+    let rebirths = 0;
+    let rebirthBonus = 0;
+
+    const baseCpsUpgrades = [
+      { name: "Auto-clicker (1 CPS)", cost: 63, cps: 1 },
+      { name: "Ciastkarka (5 CPS)", cost: 313, cps: 5 },
+      { name: "Maszyna (10 CPS)", cost: 625, cps: 10 },
+      { name: "Fabryka (20 CPS)", cost: 1250, cps: 20 },
+      { name: "Kopalnia (40 CPS)", cost: 2500, cps: 40 },
+      { name: "Bank (80 CPS)", cost: 5000, cps: 80 },
+      { name: "Świątynia (160 CPS)", cost: 10000, cps: 160 },
+      { name: "Laboratorium (320 CPS)", cost: 20000, cps: 320 },
+      { name: "Portal (640 CPS)", cost: 40000, cps: 640 },
+      { name: "Wszechświat (1280 CPS)", cost: 80000, cps: 1280 }
+    ];
+    const baseCpcUpgrades = [
+      { name: "Klikacz (+1 CPC)", cost: 13, cpc: 1 },
+      { name: "Palec mocy (+2 CPC)", cost: 25, cpc: 2 },
+      { name: "Super palec (+3 CPC)", cost: 63, cpc: 3 },
+      { name: "Kliker laserowy (+5 CPC)", cost: 125, cpc: 5 },
+      { name: "Poduszka klików (+10 CPC)", cost: 250, cpc: 10 },
+      { name: "Miotacz klików (+15 CPC)", cost: 625, cpc: 15 },
+      { name: "Ręka Boga (+25 CPC)", cost: 1250, cpc: 25 },
+      { name: "Cyber Palec (+40 CPC)", cost: 2500, cpc: 40 },
+      { name: "Boski Klik (+60 CPC)", cost: 5000, cpc: 60 },
+      { name: "Klik absolutny (+100 CPC)", cost: 10000, cpc: 100 }
+    ];
+    const upgradesData = [...baseCpsUpgrades, ...baseCpcUpgrades];
+
+    const cookieEl = document.getElementById("cookie");
+    const cookieCountEl = document.getElementById("cookieCount");
+    const statsEl = document.getElementById("stats");
+    const upgradesContainer = document.getElementById("upgrades");
+    const skinIcon = document.getElementById("skinIcon");
+    const skinShop = document.getElementById("skinShop");
+    const customPrompt = document.getElementById("customSkinPrompt");
+    const customInput = document.getElementById("customEmojiInput");
+    const shopIcon = document.getElementById("shopIcon");
+
+    const skinEmojis = {
+      default: "🍪", gold: "✨", pink: "🎀", blue: "🔵",
+      cat: "😺", dog: "🐶", frog: "🐸", penguin: "🐧",
+      bear: "🐻", pig: "🐷"
+    };
+
+    function updateUI() {
+      cookieCountEl.textContent = Math.floor(cookies);
+      statsEl.textContent = `CPC: ${cpc} | CPS: ${cps} | Rebirthy: ${rebirths} (bonus: ${rebirthBonus}%)`;
+    }
+
+    function addUpgradeButtons() {
+      upgradesContainer.innerHTML = "";
+      upgradesData.forEach((upg, index) => {
+        const btn = document.createElement("button");
+        btn.className = "upgrade";
+        btn.textContent = `${upg.name} - ${upg.cost} ciastek`;
+        btn.onclick = () => buyUpgrade(index);
+        upgradesContainer.appendChild(btn);
+      });
+    }
+
+    function buyUpgrade(index) {
+      const upg = upgradesData[index];
+      if (cookies >= upg.cost) {
+        cookies -= upg.cost;
+        if (upg.cps) cps += upg.cps;
+        if (upg.cpc) cpc += upg.cpc;
+        // Zaokrąglanie w górę do najbliższej dziesiątki
+        upgradesData[index].cost = Math.ceil(upg.cost * 1.15 / 10) * 10;
+        addUpgradeButtons();
+        updateUI();
+      }
+    }
+
+    function setSkin(skin) {
+      if (skinEmojis[skin]) {
+        cookieEl.textContent = skinEmojis[skin];
+      }
+    }
+
+    function showCustomSkinPrompt() {
+      customPrompt.style.display = "block";
+    }
+
+    function applyCustomSkin() {
+      const emoji = customInput.value.trim();
+      if (emoji) {
+        cookieEl.textContent = emoji;
+        customPrompt.style.display = "none";
+        customInput.value = "";
+      }
+    }
+
+    function resetGame() {
+      if (confirm("Na pewno zresetować grę?")) {
+        cookies = 0;
+        cpc = 1;
+        cps = 0;
+        rebirths = 0;
+        rebirthBonus = 0;
+        baseCpsUpgrades.forEach((u, i) => {
+          upgradesData[i].cost = u.cost;
+        });
+        baseCpcUpgrades.forEach((u, i) => {
+          upgradesData[i + 10].cost = u.cost;
+        });
+        addUpgradeButtons();
+        updateUI();
+      }
+    }
+
+    function doRebirth() {
+      if (cookies >= 1000000) {
+        cookies = 0;
+        cpc = 1;
+        cps = 0;
+        rebirths++;
+        rebirthBonus = rebirths * 5;
+        baseCpsUpgrades.forEach((u, i) => {
+          upgradesData[i].cost = u.cost;
+        });
+        baseCpcUpgrades.forEach((u, i) => {
+          upgradesData[i + 10].cost = u.cost;
+        });
+        addUpgradeButtons();
+        updateUI();
+      } else {
+        alert("Potrzebujesz 1 000 000 ciastek!");
+      }
+    }
+
+    cookieEl.addEventListener("click", () => {
+      cookies += cpc + Math.floor(cpc * (rebirthBonus / 100));
+      cookieEl.classList.add("clicked");
+      setTimeout(() => cookieEl.classList.remove("clicked"), 100);
+      updateUI();
+    });
+
+    // Przełączanie sklepu ze skórkami
+    skinIcon.addEventListener("click", () => {
+      if (skinShop.style.display === "block") {
+        skinShop.style.display = "none";
+      } else {
+        skinShop.style.display = "block";
+        upgradesContainer.style.display = "none"; // ukryj ulepszenia
+      }
+    });
+
+    // Przełączanie sklepu z ulepszeniami
+    shopIcon.addEventListener("click", () => {
+      if (upgradesContainer.style.display === "block") {
+        upgradesContainer.style.display = "none";
+      } else {
+        upgradesContainer.style.display = "block";
+        skinShop.style.display = "none"; // ukryj sklep skórek
+      }
+    });
+
+    setInterval(() => {
+      cookies += cps + Math.floor(cps * (rebirthBonus / 100));
+      updateUI();
+    }, 1000);
+
+    // Start
+    setSkin("default");
+    addUpgradeButtons();
+    upgradesContainer.style.display = "none"; // ukryte na start
+    updateUI();
+  </script>
+</body>
+</html>
